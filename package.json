@@ -13,7 +13,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
-    "dev": "tsx src/index.ts"
+    "dev": "tsx src/index.ts",
+    "prepublishOnly": "npm test && npm run build"
   },
   "keywords": ["mcp", "text-to-speech", "tts", "say", "accessibility"],
   "author": "",

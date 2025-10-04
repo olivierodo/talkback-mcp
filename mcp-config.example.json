@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "talkback": {
+      "command": "node",
+      "args": [
+        "/absolute/path/to/talkback-mcp/dist/index.js"
+      ]
+    }
+  }
+}
