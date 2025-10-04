@@ -1,0 +1,32 @@
+{
+  "name": "talkback-mcp",
+  "version": "1.0.0",
+  "description": "Let your MCP talk, so you can listen, not read.",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "talkback-mcp": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:ui": "vitest --ui",
+    "dev": "tsx src/index.ts",
+    "prepublishOnly": "npm test && npm run build"
+  },
+  "keywords": ["mcp", "text-to-speech", "tts", "say", "accessibility"],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/node": "^24.6.2",
+    "@vitest/ui": "^3.2.4",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.19.1"
+  }
+}
