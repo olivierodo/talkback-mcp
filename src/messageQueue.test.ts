@@ -229,4 +229,62 @@ describe('MessageQueue', () => {
       expect(queuedMessage.message.length).toBe(500);
     });
   });
+
+  describe('voice support', () => {
+    it('should support optional voice parameter', () => {
+      const message = 'Test message';
+      const voice = 'Alex';
+      const queuedMessage = queue.enqueue(message, voice);
+
+      expect(queuedMessage.voice).toBe(voice);
+      expect(queuedMessage.message).toBe(message);
+    });
+
+    it('should work without voice parameter', () => {
+      const message = 'Test message';
+      const queuedMessage = queue.enqueue(message);
+
+      expect(queuedMessage.voice).toBeUndefined();
+      expect(queuedMessage.message).toBe(message);
+    });
+
+    it('should pass voice to say command', async () => {
+      const message = 'Test message';
+      const voice = 'Samantha';
+      queue.enqueue(message, voice);
+
+      // Wait for processing to start
+      await new Promise(resolve => setTimeout(resolve, 10));
+
+      expect(spawn).toHaveBeenCalledWith('say', ['-v', voice, message]);
+    });
+
+    it('should call say without voice flag when no voice specified', async () => {
+      const message = 'Test message';
+      queue.enqueue(message);
+
+      // Wait for processing to start
+      await new Promise(resolve => setTimeout(resolve, 10));
+
+      expect(spawn).toHaveBeenCalledWith('say', [message]);
+    });
+
+    it('should handle multiple messages with different voices', async () => {
+      queue.enqueue('Message 1', 'Alex');
+      queue.enqueue('Message 2', 'Samantha');
+
+      // Wait for first message to start
+      await new Promise(resolve => setTimeout(resolve, 20));
+      
+      // Simulate first message completion
+      mockProcesses[0].emit('close', 0);
+
+      // Wait for second message to start
+      await new Promise(resolve => setTimeout(resolve, 20));
+
+      expect(spawn).toHaveBeenCalledTimes(2);
+      expect(spawn).toHaveBeenNthCalledWith(1, 'say', ['-v', 'Alex', 'Message 1']);
+      expect(spawn).toHaveBeenNthCalledWith(2, 'say', ['-v', 'Samantha', 'Message 2']);
+    });
+  });
 });
