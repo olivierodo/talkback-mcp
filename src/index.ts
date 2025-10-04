@@ -8,6 +8,7 @@ import {
   Tool,
 } from '@modelcontextprotocol/sdk/types.js';
 import { MessageQueue } from './messageQueue.js';
+import { SessionStorage, Session } from './sessionStorage.js';
 
 // Parse command-line arguments for debug mode
 const args = process.argv.slice(2);
@@ -29,15 +30,8 @@ const AVAILABLE_VOICES = [
   'Samantha', 'Victoria', 'Fiona', 'Tessa', 'Veena'
 ];
 
-// Session manager to track sessions and their assigned voices
-interface Session {
-  id: string;
-  name: string;
-  voice: string;
-  enabled: boolean;
-}
-
-const sessions = new Map<string, Session>();
+// Session storage to persist sessions per process
+const sessionStorage = new SessionStorage();
 let voiceIndex = 0;
 
 /**
@@ -60,16 +54,16 @@ function getNextVoice(): string {
  * Get or create a session
  */
 function getOrCreateSession(sessionId: string): Session {
-  if (!sessions.has(sessionId)) {
+  if (!sessionStorage.has(sessionId)) {
     const session: Session = {
       id: sessionId,
       name: getRandomName(),
       voice: getNextVoice(),
       enabled: false,
     };
-    sessions.set(sessionId, session);
+    sessionStorage.set(sessionId, session);
   }
-  return sessions.get(sessionId)!;
+  return sessionStorage.get(sessionId)!;
 }
 
 /**
@@ -231,6 +225,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         
         const session = getOrCreateSession(sessionId);
         session.enabled = true;
+        sessionStorage.set(sessionId, session); // Persist the enabled state
         const instructions = getInitInstructions(session);
         const introduction = getIntroduction(session);
         
@@ -265,6 +260,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         
         const session = getOrCreateSession(sessionId);
         session.enabled = false;
+        sessionStorage.set(sessionId, session); // Persist the disabled state
         
         return {
           content: [
