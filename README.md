@@ -26,6 +26,7 @@ npm run build
 
 ### Running the Server
 
+**Normal mode (default):**
 ```bash
 npm run dev
 ```
@@ -35,6 +36,17 @@ Or use the built version:
 ```bash
 node dist/index.js
 ```
+
+**Debug mode:**
+```bash
+node dist/index.js --debug
+```
+
+In normal mode, the server responds with simple emoji acknowledgements:
+- 🔊 for successful operations
+- 🔇 for failed operations
+
+In debug mode, the server provides full JSON responses with detailed information including messageId, message, voices, queuePosition, and success status.
 
 ### Available Tools
 
@@ -135,12 +147,25 @@ Get the current status of the speech queue.
 
 Add to your MCP client configuration (e.g., Claude Desktop):
 
+**Normal mode:**
 ```json
 {
   "mcpServers": {
     "talkback": {
       "command": "node",
       "args": ["/path/to/talkback-mcp/dist/index.js"]
+    }
+  }
+}
+```
+
+**Debug mode:**
+```json
+{
+  "mcpServers": {
+    "talkback": {
+      "command": "node",
+      "args": ["/path/to/talkback-mcp/dist/index.js", "--debug"]
     }
   }
 }

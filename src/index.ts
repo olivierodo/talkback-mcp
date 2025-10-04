@@ -9,6 +9,10 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import { MessageQueue } from './messageQueue.js';
 
+// Parse command-line arguments for debug mode
+const args = process.argv.slice(2);
+const debugMode = args.includes('--debug');
+
 // Initialize the message queue with a 500 character limit
 const messageQueue = new MessageQueue(500);
 
@@ -94,6 +98,24 @@ Here are your behavioral guidelines:
 5. **Multi-session support**: You're using the voice "${session.voice}" so the user can distinguish you from other sessions. All sessions share the same queue to avoid overlapping speech.
 
 IMPORTANT: Now that speech is enabled, you MUST provide short spoken summaries for every instruction and action you perform. Do not wait for reminders - speak proactively for all your work.`;
+}
+
+/**
+ * Format response based on debug mode
+ * In debug mode: return full details
+ * In normal mode: return simple emoji acknowledgement
+ */
+function formatResponse(data: { success: boolean; [key: string]: any }): string {
+  if (debugMode) {
+    return JSON.stringify(data, null, 2);
+  }
+  
+  // Simple emoji-based response for non-debug mode
+  if (data.success) {
+    return '🔊';
+  } else {
+    return '🔇';
+  }
 }
 
 // Define the available tools
@@ -219,7 +241,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           content: [
             {
               type: 'text',
-              text: JSON.stringify({
+              text: formatResponse({
                 success: true,
                 sessionId: session.id,
                 name: session.name,
@@ -228,7 +250,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 introduction,
                 introductionMessageId: queuedMessage.id,
                 instructions,
-              }, null, 2),
+              }),
             },
           ],
         };
@@ -248,12 +270,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           content: [
             {
               type: 'text',
-              text: JSON.stringify({
+              text: formatResponse({
                 success: true,
                 sessionId: session.id,
                 enabled: false,
                 message: 'Speech feature has been disabled for this session',
-              }, null, 2),
+              }),
             },
           ],
         };
@@ -277,10 +299,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             content: [
               {
                 type: 'text',
-                text: JSON.stringify({
+                text: formatResponse({
                   success: false,
                   error: 'Speech is not enabled for this session. Call the "enable" tool first.',
-                }, null, 2),
+                }),
               },
             ],
             isError: true,
@@ -293,13 +315,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           content: [
             {
               type: 'text',
-              text: JSON.stringify({
+              text: formatResponse({
                 success: true,
                 messageId: queuedMessage.id,
                 message: queuedMessage.message,
                 voice: session.voice,
                 queuePosition: messageQueue.getStatus().queueLength,
-              }, null, 2),
+              }),
             },
           ],
         };
@@ -318,13 +340,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           content: [
             {
               type: 'text',
-              text: JSON.stringify({
+              text: formatResponse({
                 success: cancelled,
                 messageId,
                 message: cancelled 
                   ? 'Message cancelled successfully' 
                   : 'Message not found in queue',
-              }, null, 2),
+              }),
             },
           ],
         };
@@ -337,10 +359,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           content: [
             {
               type: 'text',
-              text: JSON.stringify({
+              text: formatResponse({
                 success: true,
                 message: 'Queue reset successfully',
-              }, null, 2),
+              }),
             },
           ],
         };
@@ -353,12 +375,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           content: [
             {
               type: 'text',
-              text: JSON.stringify({
+              text: formatResponse({
                 success: true,
                 queueLength: status.queueLength,
                 isProcessing: status.isProcessing,
                 queue: status.queue,
-              }, null, 2),
+              }),
             },
           ],
         };
@@ -373,10 +395,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       content: [
         {
           type: 'text',
-          text: JSON.stringify({
+          text: formatResponse({
             success: false,
             error: errorMessage,
-          }, null, 2),
+          }),
         },
       ],
       isError: true,
@@ -390,7 +412,7 @@ async function main() {
   await server.connect(transport);
   
   // Log to stderr so it doesn't interfere with the MCP protocol
-  console.error('Talkback MCP server running on stdio');
+  console.error(`Talkback MCP server running on stdio${debugMode ? ' (debug mode enabled)' : ''}`);
 }
 
 main().catch((error) => {
