@@ -16,11 +16,18 @@ This MCP server provides text-to-speech functionality using macOS's `say` comman
    - Supports optional voice parameter for multi-session support
    - Provides queue management (cancel, reset)
 
-2. **MCP Server** (`src/index.ts`)
+2. **SessionStorage** (`src/sessionStorage.ts`)
+   - Persists session data to the filesystem using process PID
+   - Stores sessions in `~/.talkback-sessions/sessions-<PID>.json`
+   - Ensures voice consistency across tool calls within the same process
+   - Prevents voice changes when sessions are recreated
+   - Automatically loads sessions on initialization
+
+3. **MCP Server** (`src/index.ts`)
    - Implements the Model Context Protocol server
    - Provides 5 tools for LLM interaction
    - Handles JSON-RPC communication via stdio
-   - Integrates with the MessageQueue
+   - Integrates with the MessageQueue and SessionStorage
    - Provides behavioral guidelines through the init tool
    - Manages session state with unique voice assignments
    - Maintains a shared queue across all sessions
@@ -87,7 +94,10 @@ Process next message in queue (may be from different session)
 
 - **Session Creation**: Each unique `sessionId` creates a new session on first use
 - **Voice Assignment**: Sessions are assigned voices in rotation from a predefined list
-- **Voice Consistency**: Same `sessionId` always uses the same voice
+- **Voice Consistency**: Same `sessionId` always uses the same voice within a process
+- **Session Persistence**: Sessions are persisted to the filesystem using the process PID as an identifier
+- **Storage Location**: Sessions stored in `tmpdir()/.talkback-sessions/sessions-<PID>.json`
+- **Process Isolation**: Each MCP server process maintains its own session file
 - **Shared Queue**: All sessions use the same message queue to prevent overlapping speech
 - **Sequential Processing**: Messages from different sessions are processed in order
 
@@ -111,7 +121,15 @@ The project includes comprehensive tests:
   - Voice parameter support
   - Multi-voice message processing
 
-- **Integration Tests** (13 tests in `integration.test.ts`)
+- **Session Storage Tests** (11 tests in `sessionStorage.test.ts`)
+  - Session creation and retrieval
+  - Session persistence to filesystem
+  - Loading sessions from disk on initialization
+  - Voice consistency across storage instances
+  - Multiple session management
+  - Error handling for corrupt files
+
+- **Integration Tests** (14 tests in `integration.test.ts`)
   - Tool definitions with sessionId parameters
   - Response format validation
   - Message validation

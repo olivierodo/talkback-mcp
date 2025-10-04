@@ -9,6 +9,7 @@ A Model Context Protocol (MCP) server that provides text-to-speech functionality
 - ✅ **Enable/Disable Speech**: Control when the LLM should speak with enable/disable commands
 - ✅ **Multi-Session Support**: Handle multiple concurrent sessions with unique voices per session
 - ✅ **Voice Differentiation**: Each session uses a different voice for easy identification
+- ✅ **Session Persistence**: Sessions are persisted to filesystem using process PID for voice consistency
 - ✅ **Message Queuing**: Messages are queued and spoken sequentially across all sessions
 - ✅ **Shared Queue**: Prevents overlapping speech from multiple sessions
 - ✅ **Character Limiting**: Automatically truncates messages longer than 500 characters
@@ -204,12 +205,15 @@ npm run test:ui    # Run tests with UI
 2. Upon enabling, the LLM receives a brief introduction message that is immediately queued to be spoken
 3. The LLM also receives behavioral guidelines in the JSON response, instructing it to speak NOW for all actions
 4. Each session gets a different voice (e.g., Alex, Daniel, Samantha) for easy identification
-5. The LLM uses the `speak` tool with its `sessionId` to queue messages (only works if speech is enabled)
-6. Messages are automatically truncated to 500 characters if needed
-7. The queue is shared across all sessions and processes messages sequentially using macOS's `say` command
-8. This prevents overlapping speech from multiple concurrent sessions
-9. The LLM can cancel individual messages or reset the queue if actions change
-10. The LLM can call `disable` to turn off speech for a session
+5. Session data (including voice assignments) is persisted to the filesystem using the process PID as an identifier
+6. This ensures that the same `sessionId` maintains the same voice across all tool calls within the same process
+7. The LLM uses the `speak` tool with its `sessionId` to queue messages (only works if speech is enabled)
+8. Messages are automatically truncated to 500 characters if needed
+9. The queue is shared across all sessions and processes messages sequentially using macOS's `say` command
+10. This prevents overlapping speech from multiple concurrent sessions
+11. The LLM can cancel individual messages or reset the queue if actions change
+12. The LLM can call `disable` to turn off speech for a session
+13. Sessions are stored in `tmpdir()/.talkback-sessions/sessions-<PID>.json` for persistence
 
 ## License
 
