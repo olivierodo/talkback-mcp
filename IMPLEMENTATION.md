@@ -17,29 +17,36 @@ This MCP server provides text-to-speech functionality using macOS's `say` comman
 
 2. **MCP Server** (`src/index.ts`)
    - Implements the Model Context Protocol server
-   - Provides 4 tools for LLM interaction
+   - Provides 5 tools for LLM interaction
    - Handles JSON-RPC communication via stdio
    - Integrates with the MessageQueue
+   - Provides behavioral guidelines through the init tool
 
 ### Tools
 
-#### 1. `speak`
+#### 1. `init`
+Provides initialization and behavioral guidelines for the LLM.
+- **Input**: `{}`
+- **Output**: `{ success: true, instructions: string }`
+- **Features**: Returns guidelines on how to use speech effectively, includes random name introduction
+
+#### 2. `speak`
 Adds a message to the speech queue.
 - **Input**: `{ message: string }`
 - **Output**: `{ success: true, messageId: string, message: string, queuePosition: number }`
 - **Features**: Auto-truncates to 500 chars
 
-#### 2. `cancel_message`
+#### 3. `cancel_message`
 Cancels a queued message by ID.
 - **Input**: `{ messageId: string }`
 - **Output**: `{ success: boolean, messageId: string, message: string }`
 
-#### 3. `reset_queue`
+#### 4. `reset_queue`
 Clears the queue and stops current playback.
 - **Input**: `{}`
 - **Output**: `{ success: true, message: string }`
 
-#### 4. `get_queue_status`
+#### 5. `get_queue_status`
 Returns current queue status.
 - **Input**: `{}`
 - **Output**: `{ success: true, queueLength: number, isProcessing: boolean, queue: QueuedMessage[] }`
@@ -80,18 +87,20 @@ The project includes comprehensive tests:
   - Sequential processing
   - Error handling
 
-- **Integration Tests** (7 tests in `integration.test.ts`)
+- **Integration Tests** (9 tests in `integration.test.ts`)
   - Tool definitions
   - Response format validation
   - Message validation
+  - Init tool validation
 
 ## Use Cases
 
-1. **Build Progress**: Notify when builds start/complete
-2. **Test Results**: Announce test pass/fail status
-3. **Error Alerts**: Alert on critical errors
-4. **Task Completion**: Notify when long-running tasks finish
-5. **Context Switching**: Help developers know when to check their work
+1. **Session Initialization**: LLM receives behavioral guidelines on how to communicate effectively through speech
+2. **Build Progress**: Notify when builds start/complete
+3. **Test Results**: Announce test pass/fail status
+4. **Error Alerts**: Alert on critical errors
+5. **Task Completion**: Notify when long-running tasks finish
+6. **Context Switching**: Help developers know when to check their work
 
 ## Requirements
 
