@@ -2,7 +2,7 @@
 
 ## Overview
 
-This MCP server provides text-to-speech functionality using macOS's `say` command, allowing LLMs to communicate their actions audibly to developers.
+This MCP server provides text-to-speech functionality using macOS's `say` command, allowing LLMs to communicate their actions audibly to developers. It supports multiple concurrent sessions with unique voice assignments and a shared message queue to prevent overlapping speech.
 
 ## Architecture
 
@@ -13,6 +13,7 @@ This MCP server provides text-to-speech functionality using macOS's `say` comman
    - Enforces a 500-character limit per message
    - Processes messages sequentially
    - Handles `say` command execution via child processes
+   - Supports optional voice parameter for multi-session support
    - Provides queue management (cancel, reset)
 
 2. **MCP Server** (`src/index.ts`)
@@ -21,20 +22,29 @@ This MCP server provides text-to-speech functionality using macOS's `say` comman
    - Handles JSON-RPC communication via stdio
    - Integrates with the MessageQueue
    - Provides behavioral guidelines through the init tool
+   - Manages session state with unique voice assignments
+   - Maintains a shared queue across all sessions
 
 ### Tools
 
 #### 1. `init`
-Provides initialization and behavioral guidelines for the LLM.
-- **Input**: `{}`
-- **Output**: `{ success: true, instructions: string }`
-- **Features**: Returns guidelines on how to use speech effectively, includes random name introduction
+Provides initialization and behavioral guidelines for the LLM with session-specific voice assignment.
+- **Input**: `{ sessionId: string }`
+- **Output**: `{ success: true, sessionId: string, name: string, voice: string, instructions: string }`
+- **Features**: 
+  - Assigns a unique voice to each session
+  - Returns guidelines on how to use speech effectively
+  - Includes random name introduction
+  - Mentions multi-session support and voice differentiation
 
 #### 2. `speak`
-Adds a message to the speech queue.
-- **Input**: `{ message: string }`
-- **Output**: `{ success: true, messageId: string, message: string, queuePosition: number }`
-- **Features**: Auto-truncates to 500 chars
+Adds a message to the speech queue with session-specific voice.
+- **Input**: `{ message: string, sessionId: string }`
+- **Output**: `{ success: true, messageId: string, message: string, voice: string, queuePosition: number }`
+- **Features**: 
+  - Auto-truncates to 500 chars
+  - Uses session's assigned voice
+  - Returns voice information in response
 
 #### 3. `cancel_message`
 Cancels a queued message by ID.
@@ -56,18 +66,30 @@ Returns current queue status.
 ### Message Processing Flow
 
 ```
-LLM calls speak() 
+LLM calls init(sessionId) 
   ↓
-Message added to queue (truncated if needed)
+Session created with unique voice assignment
+  ↓
+LLM calls speak(message, sessionId)
+  ↓
+Message added to shared queue with voice (truncated if needed)
   ↓
 Queue processor starts (if not running)
   ↓
-spawn('say', [message])
+spawn('say', ['-v', voice, message])
   ↓
 Wait for completion
   ↓
-Process next message in queue
+Process next message in queue (may be from different session)
 ```
+
+### Multi-Session Management
+
+- **Session Creation**: Each unique `sessionId` creates a new session on first use
+- **Voice Assignment**: Sessions are assigned voices in rotation from a predefined list
+- **Voice Consistency**: Same `sessionId` always uses the same voice
+- **Shared Queue**: All sessions use the same message queue to prevent overlapping speech
+- **Sequential Processing**: Messages from different sessions are processed in order
 
 ### Error Handling
 
@@ -80,27 +102,32 @@ Process next message in queue
 
 The project includes comprehensive tests:
 
-- **Unit Tests** (18 tests in `messageQueue.test.ts`)
+- **Unit Tests** (23 tests in `messageQueue.test.ts`)
   - Message queueing and truncation
   - Queue management (cancel, reset)
   - Status reporting
   - Sequential processing
   - Error handling
+  - Voice parameter support
+  - Multi-voice message processing
 
-- **Integration Tests** (9 tests in `integration.test.ts`)
-  - Tool definitions
+- **Integration Tests** (13 tests in `integration.test.ts`)
+  - Tool definitions with sessionId parameters
   - Response format validation
   - Message validation
   - Init tool validation
+  - Multi-session support validation
+  - Voice assignment verification
 
 ## Use Cases
 
-1. **Session Initialization**: LLM receives behavioral guidelines on how to communicate effectively through speech
-2. **Build Progress**: Notify when builds start/complete
-3. **Test Results**: Announce test pass/fail status
-4. **Error Alerts**: Alert on critical errors
-5. **Task Completion**: Notify when long-running tasks finish
-6. **Context Switching**: Help developers know when to check their work
+1. **Session Initialization**: LLM receives behavioral guidelines and voice assignment on how to communicate effectively through speech
+2. **Multi-Window Workflow**: Users working with multiple AI sessions can distinguish which session is speaking by voice
+3. **Build Progress**: Notify when builds start/complete from different sessions
+4. **Test Results**: Announce test pass/fail status from multiple test runs
+5. **Error Alerts**: Alert on critical errors with distinct voices per session
+6. **Task Completion**: Notify when long-running tasks finish from different sessions
+7. **Context Switching**: Help developers know which session needs attention
 
 ## Requirements
 
@@ -112,11 +139,12 @@ The project includes comprehensive tests:
 
 Potential improvements:
 - Support for other TTS engines (espeak, festival)
-- Voice customization
+- Custom voice selection per session
 - Speaking rate control
 - Priority queue for urgent messages
 - Message filtering/deduplication
 - Cross-platform support
+- Session cleanup for inactive sessions
 
 ## Security Considerations
 

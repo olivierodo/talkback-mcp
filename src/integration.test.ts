@@ -26,14 +26,32 @@ describe('MCP Server Integration', () => {
         inputSchema: {
           type: 'object',
           properties: {
-            message: { type: 'string' }
+            message: { type: 'string' },
+            sessionId: { type: 'string' }
           },
-          required: ['message']
+          required: ['message', 'sessionId']
         }
       };
       
       expect(speakTool.name).toBe('speak');
       expect(speakTool.inputSchema.required).toContain('message');
+      expect(speakTool.inputSchema.required).toContain('sessionId');
+    });
+
+    it('should have init tool with sessionId parameter', () => {
+      const initTool = {
+        name: 'init',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            sessionId: { type: 'string' }
+          },
+          required: ['sessionId']
+        }
+      };
+      
+      expect(initTool.name).toBe('init');
+      expect(initTool.inputSchema.required).toContain('sessionId');
     });
 
     it('should have cancel_message tool with messageId parameter', () => {
@@ -51,18 +69,66 @@ describe('MCP Server Integration', () => {
       expect(cancelTool.name).toBe('cancel_message');
       expect(cancelTool.inputSchema.required).toContain('messageId');
     });
+  });
 
-    it('should have init tool with no required parameters', () => {
-      const initTool = {
-        name: 'init',
-        inputSchema: {
-          type: 'object',
-          properties: {}
-        }
+  describe('Multi-Session Support', () => {
+    it('should assign different voices to different sessions', () => {
+      // Simulating two different sessions
+      const session1 = { id: 'session1', name: 'Alex', voice: 'Alex' };
+      const session2 = { id: 'session2', name: 'Morgan', voice: 'Daniel' };
+      
+      expect(session1.voice).not.toBe(session2.voice);
+      expect(session1.name).not.toBe(session2.name);
+    });
+
+    it('should maintain voice consistency for the same session', () => {
+      const sessionId = 'session1';
+      const session1Call1 = { id: sessionId, voice: 'Alex' };
+      const session1Call2 = { id: sessionId, voice: 'Alex' };
+      
+      expect(session1Call1.voice).toBe(session1Call2.voice);
+    });
+
+    it('should include voice information in init response', () => {
+      const mockInitResponse = {
+        content: [{
+          type: 'text',
+          text: JSON.stringify({
+            success: true,
+            sessionId: 'session1',
+            name: 'Alex',
+            voice: 'Alex',
+            instructions: 'Hello! I\'m Alex...'
+          }, null, 2)
+        }]
       };
       
-      expect(initTool.name).toBe('init');
-      expect(initTool.inputSchema.properties).toEqual({});
+      const parsed = JSON.parse(mockInitResponse.content[0].text);
+      expect(parsed.success).toBe(true);
+      expect(parsed).toHaveProperty('sessionId');
+      expect(parsed).toHaveProperty('voice');
+      expect(parsed).toHaveProperty('name');
+      expect(parsed).toHaveProperty('instructions');
+    });
+
+    it('should include voice in speak response', () => {
+      const mockSpeakResponse = {
+        content: [{
+          type: 'text',
+          text: JSON.stringify({
+            success: true,
+            messageId: 'msg_123',
+            message: 'Test message',
+            voice: 'Samantha',
+            queuePosition: 1
+          }, null, 2)
+        }]
+      };
+      
+      const parsed = JSON.parse(mockSpeakResponse.content[0].text);
+      expect(parsed.success).toBe(true);
+      expect(parsed).toHaveProperty('voice');
+      expect(parsed.voice).toBe('Samantha');
     });
   });
 

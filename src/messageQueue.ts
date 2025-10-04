@@ -4,6 +4,7 @@ export interface QueuedMessage {
   id: string;
   message: string;
   timestamp: number;
+  voice?: string;
 }
 
 export class MessageQueue {
@@ -19,12 +20,13 @@ export class MessageQueue {
   /**
    * Add a message to the queue
    */
-  enqueue(message: string): QueuedMessage {
+  enqueue(message: string, voice?: string): QueuedMessage {
     const truncatedMessage = this.truncateMessage(message);
     const queuedMessage: QueuedMessage = {
       id: this.generateId(),
       message: truncatedMessage,
       timestamp: Date.now(),
+      voice,
     };
     
     this.queue.push(queuedMessage);
@@ -102,7 +104,7 @@ export class MessageQueue {
       const message = this.queue[0];
       
       try {
-        await this.speak(message.message);
+        await this.speak(message.message, message.voice);
         this.queue.shift(); // Remove the processed message
       } catch (error) {
         console.error('Error speaking message:', error);
@@ -116,9 +118,10 @@ export class MessageQueue {
   /**
    * Speak a message using the 'say' command (macOS)
    */
-  private speak(message: string): Promise<void> {
+  private speak(message: string, voice?: string): Promise<void> {
     return new Promise((resolve, reject) => {
-      this.currentProcess = spawn('say', [message]);
+      const args = voice ? ['-v', voice, message] : [message];
+      this.currentProcess = spawn('say', args);
 
       this.currentProcess.on('close', (code) => {
         this.currentProcess = null;

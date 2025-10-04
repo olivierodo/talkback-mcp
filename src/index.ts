@@ -19,6 +19,22 @@ const RANDOM_NAMES = [
   'Sam', 'Jamie', 'Sage', 'Robin', 'Dakota'
 ];
 
+// Available voices for different sessions
+const AVAILABLE_VOICES = [
+  'Alex', 'Daniel', 'Fred', 'Karen', 'Moira',
+  'Samantha', 'Victoria', 'Fiona', 'Tessa', 'Veena'
+];
+
+// Session manager to track sessions and their assigned voices
+interface Session {
+  id: string;
+  name: string;
+  voice: string;
+}
+
+const sessions = new Map<string, Session>();
+let voiceIndex = 0;
+
 /**
  * Get a random name for the LLM to introduce itself
  */
@@ -27,11 +43,34 @@ function getRandomName(): string {
 }
 
 /**
+ * Get the next available voice in rotation
+ */
+function getNextVoice(): string {
+  const voice = AVAILABLE_VOICES[voiceIndex % AVAILABLE_VOICES.length];
+  voiceIndex++;
+  return voice;
+}
+
+/**
+ * Get or create a session
+ */
+function getOrCreateSession(sessionId: string): Session {
+  if (!sessions.has(sessionId)) {
+    const session: Session = {
+      id: sessionId,
+      name: getRandomName(),
+      voice: getNextVoice(),
+    };
+    sessions.set(sessionId, session);
+  }
+  return sessions.get(sessionId)!;
+}
+
+/**
  * Generate initialization instructions for the LLM
  */
-function getInitInstructions(): string {
-  const name = getRandomName();
-  return `Hello! I'm ${name}, your voice assistant through the Talkback MCP server.
+function getInitInstructions(session: Session): string {
+  return `Hello! I'm ${session.name}, your voice assistant through the Talkback MCP server.
 
 Here are my behavioral guidelines:
 
@@ -43,6 +82,8 @@ Here are my behavioral guidelines:
 
 4. **Regular updates**: I'll keep you informed of progress and next steps through speech, making it easier for you to multitask.
 
+5. **Multi-session support**: I'm using the voice "${session.voice}" so you can distinguish me from other sessions. All sessions share the same queue to avoid overlapping speech.
+
 Ready to assist you!`;
 }
 
@@ -50,15 +91,21 @@ Ready to assist you!`;
 const TOOLS: Tool[] = [
   {
     name: 'init',
-    description: 'Initialize the MCP server and get behavioral instructions for the LLM. This should be called at the start of a session to receive guidelines on how to interact with the user through speech.',
+    description: 'Initialize the MCP server and get behavioral instructions for the LLM. This should be called at the start of a session to receive guidelines on how to interact with the user through speech. Each session gets a unique voice to distinguish between multiple concurrent sessions.',
     inputSchema: {
       type: 'object',
-      properties: {},
+      properties: {
+        sessionId: {
+          type: 'string',
+          description: 'Unique identifier for this session. Use a consistent ID across calls to maintain the same voice.',
+        },
+      },
+      required: ['sessionId'],
     },
   },
   {
     name: 'speak',
-    description: 'Add a message to the speech queue to be spoken aloud using the macOS say command. Messages are queued and spoken sequentially. Messages longer than 500 characters will be automatically truncated.',
+    description: 'Add a message to the speech queue to be spoken aloud using the macOS say command. Messages are queued and spoken sequentially across all sessions. Messages longer than 500 characters will be automatically truncated. The message will be spoken using the voice assigned to the session.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -66,8 +113,12 @@ const TOOLS: Tool[] = [
           type: 'string',
           description: 'The message to speak aloud',
         },
+        sessionId: {
+          type: 'string',
+          description: 'Session identifier to use the assigned voice for this session',
+        },
       },
-      required: ['message'],
+      required: ['message', 'sessionId'],
     },
   },
   {
@@ -127,7 +178,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   try {
     switch (name) {
       case 'init': {
-        const instructions = getInitInstructions();
+        const { sessionId } = args as { sessionId: string };
+        
+        if (!sessionId || typeof sessionId !== 'string') {
+          throw new Error('Session ID must be a non-empty string');
+        }
+        
+        const session = getOrCreateSession(sessionId);
+        const instructions = getInitInstructions(session);
         
         return {
           content: [
@@ -135,6 +193,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               type: 'text',
               text: JSON.stringify({
                 success: true,
+                sessionId: session.id,
+                name: session.name,
+                voice: session.voice,
                 instructions,
               }, null, 2),
             },
@@ -143,13 +204,18 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case 'speak': {
-        const { message } = args as { message: string };
+        const { message, sessionId } = args as { message: string; sessionId: string };
         
         if (!message || typeof message !== 'string') {
           throw new Error('Message must be a non-empty string');
         }
-
-        const queuedMessage = messageQueue.enqueue(message);
+        
+        if (!sessionId || typeof sessionId !== 'string') {
+          throw new Error('Session ID must be a non-empty string');
+        }
+        
+        const session = getOrCreateSession(sessionId);
+        const queuedMessage = messageQueue.enqueue(message, session.voice);
         
         return {
           content: [
@@ -159,6 +225,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 success: true,
                 messageId: queuedMessage.id,
                 message: queuedMessage.message,
+                voice: session.voice,
                 queuePosition: messageQueue.getStatus().queueLength,
               }, null, 2),
             },
