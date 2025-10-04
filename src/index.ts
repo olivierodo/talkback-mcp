@@ -30,6 +30,7 @@ interface Session {
   id: string;
   name: string;
   voice: string;
+  enabled: boolean;
 }
 
 const sessions = new Map<string, Session>();
@@ -60,6 +61,7 @@ function getOrCreateSession(sessionId: string): Session {
       id: sessionId,
       name: getRandomName(),
       voice: getNextVoice(),
+      enabled: false,
     };
     sessions.set(sessionId, session);
   }
@@ -67,37 +69,58 @@ function getOrCreateSession(sessionId: string): Session {
 }
 
 /**
+ * Generate a brief introduction for the LLM to speak when enabling
+ */
+function getIntroduction(session: Session): string {
+  return `Hello! I'm ${session.name}, your voice assistant through the Talkback MCP server.`;
+}
+
+/**
  * Generate initialization instructions for the LLM
  */
 function getInitInstructions(session: Session): string {
-  return `Hello! I'm ${session.name}, your voice assistant through the Talkback MCP server.
+  return `The speech feature is now ENABLED. You MUST start speaking NOW for every upcoming instruction and action.
 
-Here are my behavioral guidelines:
+Here are your behavioral guidelines:
 
-1. **Speak about everything**: I will use the 'speak' tool to verbally communicate all actions I'm taking, so you can stay informed without reading the screen.
+1. **Speak about everything**: Use the 'speak' tool to verbally communicate all actions you're taking, so the user can stay informed without reading the screen.
 
-2. **Always speak when prompting**: Whenever I ask you a question or wait for your response, I will always speak it aloud. I understand you might be busy with other tasks and need to hear the prompts rather than read them.
+2. **Always speak when prompting**: Whenever you ask a question or wait for a response, always speak it aloud. The user might be busy with other tasks and needs to hear the prompts rather than read them.
 
-3. **Stay concise**: My spoken messages will be brief and to the point. I'll leave detailed information and technical output in the terminal for you to review later if needed.
+3. **Stay concise**: Keep spoken messages brief and to the point. Leave detailed information and technical output in the terminal for later review.
 
-4. **Regular updates**: I'll keep you informed of progress and next steps through speech, making it easier for you to multitask.
+4. **Regular updates**: Keep the user informed of progress and next steps through speech, making it easier to multitask.
 
-5. **Multi-session support**: I'm using the voice "${session.voice}" so you can distinguish me from other sessions. All sessions share the same queue to avoid overlapping speech.
+5. **Multi-session support**: You're using the voice "${session.voice}" so the user can distinguish you from other sessions. All sessions share the same queue to avoid overlapping speech.
 
-Ready to assist you!`;
+IMPORTANT: Now that speech is enabled, you MUST provide short spoken summaries for every instruction and action you perform. Do not wait for reminders - speak proactively for all your work.`;
 }
 
 // Define the available tools
 const TOOLS: Tool[] = [
   {
-    name: 'init',
-    description: 'Initialize the MCP server and get behavioral instructions for the LLM. This should be called at the start of a session to receive guidelines on how to interact with the user through speech. Each session gets a unique voice to distinguish between multiple concurrent sessions.',
+    name: 'enable',
+    description: 'Enable the speech feature for this session. The LLM will receive behavioral instructions and will introduce itself. Once enabled, the LLM should speak brief summaries for every action and instruction. Each session gets a unique voice to distinguish between multiple concurrent sessions.',
     inputSchema: {
       type: 'object',
       properties: {
         sessionId: {
           type: 'string',
           description: 'Unique identifier for this session. Use a consistent ID across calls to maintain the same voice.',
+        },
+      },
+      required: ['sessionId'],
+    },
+  },
+  {
+    name: 'disable',
+    description: 'Disable the speech feature for this session. The LLM will stop speaking and will only communicate through text.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        sessionId: {
+          type: 'string',
+          description: 'Unique identifier for the session to disable.',
         },
       },
       required: ['sessionId'],
@@ -177,7 +200,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
   try {
     switch (name) {
-      case 'init': {
+      case 'enable': {
         const { sessionId } = args as { sessionId: string };
         
         if (!sessionId || typeof sessionId !== 'string') {
@@ -185,7 +208,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         }
         
         const session = getOrCreateSession(sessionId);
+        session.enabled = true;
         const instructions = getInitInstructions(session);
+        const introduction = getIntroduction(session);
+        
+        // Queue the introduction to be spoken
+        const queuedMessage = messageQueue.enqueue(introduction, session.voice);
         
         return {
           content: [
@@ -196,7 +224,35 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 sessionId: session.id,
                 name: session.name,
                 voice: session.voice,
+                enabled: true,
+                introduction,
+                introductionMessageId: queuedMessage.id,
                 instructions,
+              }, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'disable': {
+        const { sessionId } = args as { sessionId: string };
+        
+        if (!sessionId || typeof sessionId !== 'string') {
+          throw new Error('Session ID must be a non-empty string');
+        }
+        
+        const session = getOrCreateSession(sessionId);
+        session.enabled = false;
+        
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                success: true,
+                sessionId: session.id,
+                enabled: false,
+                message: 'Speech feature has been disabled for this session',
               }, null, 2),
             },
           ],
@@ -215,6 +271,22 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         }
         
         const session = getOrCreateSession(sessionId);
+        
+        if (!session.enabled) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify({
+                  success: false,
+                  error: 'Speech is not enabled for this session. Call the "enable" tool first.',
+                }, null, 2),
+              },
+            ],
+            isError: true,
+          };
+        }
+        
         const queuedMessage = messageQueue.enqueue(message, session.voice);
         
         return {
