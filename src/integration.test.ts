@@ -9,6 +9,7 @@ describe('MCP Server Integration', () => {
   describe('Tool Definitions', () => {
     it('should have correct tool names', () => {
       const expectedTools = [
+        'init',
         'speak',
         'cancel_message',
         'reset_queue',
@@ -16,7 +17,7 @@ describe('MCP Server Integration', () => {
       ];
       
       // This test ensures all required tools are defined
-      expect(expectedTools).toHaveLength(4);
+      expect(expectedTools).toHaveLength(5);
     });
 
     it('should have speak tool with required parameters', () => {
@@ -49,6 +50,19 @@ describe('MCP Server Integration', () => {
       
       expect(cancelTool.name).toBe('cancel_message');
       expect(cancelTool.inputSchema.required).toContain('messageId');
+    });
+
+    it('should have init tool with no required parameters', () => {
+      const initTool = {
+        name: 'init',
+        inputSchema: {
+          type: 'object',
+          properties: {}
+        }
+      };
+      
+      expect(initTool.name).toBe('init');
+      expect(initTool.inputSchema.properties).toEqual({});
     });
   });
 
@@ -90,6 +104,27 @@ describe('MCP Server Integration', () => {
       const parsed = JSON.parse(mockErrorResponse.content[0].text);
       expect(parsed.success).toBe(false);
       expect(parsed).toHaveProperty('error');
+    });
+
+    it('should format init response correctly', () => {
+      const mockInitResponse = {
+        content: [{
+          type: 'text',
+          text: JSON.stringify({
+            success: true,
+            instructions: 'Hello! I\'m Alex, your voice assistant...'
+          }, null, 2)
+        }]
+      };
+      
+      expect(mockInitResponse.content).toHaveLength(1);
+      expect(mockInitResponse.content[0].type).toBe('text');
+      
+      const parsed = JSON.parse(mockInitResponse.content[0].text);
+      expect(parsed.success).toBe(true);
+      expect(parsed).toHaveProperty('instructions');
+      expect(typeof parsed.instructions).toBe('string');
+      expect(parsed.instructions.length).toBeGreaterThan(0);
     });
   });
 

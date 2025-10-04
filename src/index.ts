@@ -12,8 +12,50 @@ import { MessageQueue } from './messageQueue.js';
 // Initialize the message queue with a 500 character limit
 const messageQueue = new MessageQueue(500);
 
+// Random names for LLM introduction
+const RANDOM_NAMES = [
+  'Alex', 'Morgan', 'Jordan', 'Taylor', 'Casey',
+  'Riley', 'Quinn', 'Avery', 'Parker', 'Charlie',
+  'Sam', 'Jamie', 'Sage', 'Robin', 'Dakota'
+];
+
+/**
+ * Get a random name for the LLM to introduce itself
+ */
+function getRandomName(): string {
+  return RANDOM_NAMES[Math.floor(Math.random() * RANDOM_NAMES.length)];
+}
+
+/**
+ * Generate initialization instructions for the LLM
+ */
+function getInitInstructions(): string {
+  const name = getRandomName();
+  return `Hello! I'm ${name}, your voice assistant through the Talkback MCP server.
+
+Here are my behavioral guidelines:
+
+1. **Speak about everything**: I will use the 'speak' tool to verbally communicate all actions I'm taking, so you can stay informed without reading the screen.
+
+2. **Always speak when prompting**: Whenever I ask you a question or wait for your response, I will always speak it aloud. I understand you might be busy with other tasks and need to hear the prompts rather than read them.
+
+3. **Stay concise**: My spoken messages will be brief and to the point. I'll leave detailed information and technical output in the terminal for you to review later if needed.
+
+4. **Regular updates**: I'll keep you informed of progress and next steps through speech, making it easier for you to multitask.
+
+Ready to assist you!`;
+}
+
 // Define the available tools
 const TOOLS: Tool[] = [
+  {
+    name: 'init',
+    description: 'Initialize the MCP server and get behavioral instructions for the LLM. This should be called at the start of a session to receive guidelines on how to interact with the user through speech.',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
   {
     name: 'speak',
     description: 'Add a message to the speech queue to be spoken aloud using the macOS say command. Messages are queued and spoken sequentially. Messages longer than 500 characters will be automatically truncated.',
@@ -84,6 +126,22 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
   try {
     switch (name) {
+      case 'init': {
+        const instructions = getInitInstructions();
+        
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                success: true,
+                instructions,
+              }, null, 2),
+            },
+          ],
+        };
+      }
+
       case 'speak': {
         const { message } = args as { message: string };
         

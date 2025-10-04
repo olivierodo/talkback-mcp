@@ -6,6 +6,7 @@ A Model Context Protocol (MCP) server that provides text-to-speech functionality
 
 ## Features
 
+- ✅ **Initialization**: Get behavioral guidelines for LLM interaction through speech
 - ✅ **Message Queuing**: Messages are queued and spoken sequentially
 - ✅ **Character Limiting**: Automatically truncates messages longer than 500 characters
 - ✅ **Queue Management**: Cancel specific messages or reset the entire queue
@@ -34,9 +35,28 @@ node dist/index.js
 
 ### Available Tools
 
-The server provides four MCP tools:
+The server provides five MCP tools:
 
-#### 1. `speak`
+#### 1. `init`
+Initialize the MCP server and receive behavioral guidelines for the LLM. This should be called at the start of a session.
+
+**Parameters:**
+None
+
+**Returns:**
+- `success`: Boolean indicating success
+- `instructions`: String containing behavioral guidelines for the LLM, including:
+  - Speak about everything the LLM needs to do
+  - Always speak when prompting questions or waiting for answers (user might be busy)
+  - Keep speech concise, leaving details for the terminal
+  - Introduction with a randomly selected name
+
+**Example:**
+```json
+{}
+```
+
+#### 2. `speak`
 Add a message to the speech queue to be spoken aloud.
 
 **Parameters:**
@@ -49,7 +69,7 @@ Add a message to the speech queue to be spoken aloud.
 }
 ```
 
-#### 2. `cancel_message`
+#### 3. `cancel_message`
 Cancel a specific queued message before it's spoken.
 
 **Parameters:**
@@ -62,7 +82,7 @@ Cancel a specific queued message before it's spoken.
 }
 ```
 
-#### 3. `reset_queue`
+#### 4. `reset_queue`
 Reset the entire speech queue and stop any currently playing message. Use this when an action has been cancelled.
 
 **Example:**
@@ -70,7 +90,7 @@ Reset the entire speech queue and stop any currently playing message. Use this w
 {}
 ```
 
-#### 4. `get_queue_status`
+#### 5. `get_queue_status`
 Get the current status of the speech queue.
 
 **Returns:**
@@ -127,10 +147,11 @@ npm run test:ui    # Run tests with UI
 
 ## How It Works
 
-1. The LLM uses the `speak` tool to queue messages
-2. Messages are automatically truncated to 500 characters if needed
-3. The queue processes messages sequentially using macOS's `say` command
-4. The LLM can cancel individual messages or reset the queue if actions change
+1. The LLM can call `init` to receive behavioral guidelines at the start of a session
+2. The LLM uses the `speak` tool to queue messages
+3. Messages are automatically truncated to 500 characters if needed
+4. The queue processes messages sequentially using macOS's `say` command
+5. The LLM can cancel individual messages or reset the queue if actions change
 
 ## License
 
