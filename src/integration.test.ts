@@ -9,7 +9,8 @@ describe('MCP Server Integration', () => {
   describe('Tool Definitions', () => {
     it('should have correct tool names', () => {
       const expectedTools = [
-        'init',
+        'enable',
+        'disable',
         'speak',
         'cancel_message',
         'reset_queue',
@@ -17,7 +18,7 @@ describe('MCP Server Integration', () => {
       ];
       
       // This test ensures all required tools are defined
-      expect(expectedTools).toHaveLength(5);
+      expect(expectedTools).toHaveLength(6);
     });
 
     it('should have speak tool with required parameters', () => {
@@ -38,9 +39,9 @@ describe('MCP Server Integration', () => {
       expect(speakTool.inputSchema.required).toContain('sessionId');
     });
 
-    it('should have init tool with sessionId parameter', () => {
-      const initTool = {
-        name: 'init',
+    it('should have enable tool with sessionId parameter', () => {
+      const enableTool = {
+        name: 'enable',
         inputSchema: {
           type: 'object',
           properties: {
@@ -50,8 +51,24 @@ describe('MCP Server Integration', () => {
         }
       };
       
-      expect(initTool.name).toBe('init');
-      expect(initTool.inputSchema.required).toContain('sessionId');
+      expect(enableTool.name).toBe('enable');
+      expect(enableTool.inputSchema.required).toContain('sessionId');
+    });
+
+    it('should have disable tool with sessionId parameter', () => {
+      const disableTool = {
+        name: 'disable',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            sessionId: { type: 'string' }
+          },
+          required: ['sessionId']
+        }
+      };
+      
+      expect(disableTool.name).toBe('disable');
+      expect(disableTool.inputSchema.required).toContain('sessionId');
     });
 
     it('should have cancel_message tool with messageId parameter', () => {
@@ -89,8 +106,8 @@ describe('MCP Server Integration', () => {
       expect(session1Call1.voice).toBe(session1Call2.voice);
     });
 
-    it('should include voice information in init response', () => {
-      const mockInitResponse = {
+    it('should include voice information in enable response', () => {
+      const mockEnableResponse = {
         content: [{
           type: 'text',
           text: JSON.stringify({
@@ -98,16 +115,20 @@ describe('MCP Server Integration', () => {
             sessionId: 'session1',
             name: 'Alex',
             voice: 'Alex',
-            instructions: 'Hello! I\'m Alex...'
+            enabled: true,
+            introduction: 'Hello! I\'m Alex...',
+            instructions: 'The speech feature is now ENABLED...'
           }, null, 2)
         }]
       };
       
-      const parsed = JSON.parse(mockInitResponse.content[0].text);
+      const parsed = JSON.parse(mockEnableResponse.content[0].text);
       expect(parsed.success).toBe(true);
       expect(parsed).toHaveProperty('sessionId');
       expect(parsed).toHaveProperty('voice');
       expect(parsed).toHaveProperty('name');
+      expect(parsed).toHaveProperty('enabled');
+      expect(parsed).toHaveProperty('introduction');
       expect(parsed).toHaveProperty('instructions');
     });
 
@@ -172,24 +193,29 @@ describe('MCP Server Integration', () => {
       expect(parsed).toHaveProperty('error');
     });
 
-    it('should format init response correctly', () => {
-      const mockInitResponse = {
+    it('should format enable response correctly', () => {
+      const mockEnableResponse = {
         content: [{
           type: 'text',
           text: JSON.stringify({
             success: true,
-            instructions: 'Hello! I\'m Alex, your voice assistant...'
+            enabled: true,
+            introduction: 'Hello! I\'m Alex, your voice assistant...',
+            instructions: 'The speech feature is now ENABLED...'
           }, null, 2)
         }]
       };
       
-      expect(mockInitResponse.content).toHaveLength(1);
-      expect(mockInitResponse.content[0].type).toBe('text');
+      expect(mockEnableResponse.content).toHaveLength(1);
+      expect(mockEnableResponse.content[0].type).toBe('text');
       
-      const parsed = JSON.parse(mockInitResponse.content[0].text);
+      const parsed = JSON.parse(mockEnableResponse.content[0].text);
       expect(parsed.success).toBe(true);
+      expect(parsed).toHaveProperty('introduction');
       expect(parsed).toHaveProperty('instructions');
+      expect(typeof parsed.introduction).toBe('string');
       expect(typeof parsed.instructions).toBe('string');
+      expect(parsed.introduction.length).toBeGreaterThan(0);
       expect(parsed.instructions.length).toBeGreaterThan(0);
     });
   });

@@ -6,7 +6,7 @@ A Model Context Protocol (MCP) server that provides text-to-speech functionality
 
 ## Features
 
-- ✅ **Initialization**: Get behavioral guidelines for LLM interaction through speech
+- ✅ **Enable/Disable Speech**: Control when the LLM should speak with enable/disable commands
 - ✅ **Multi-Session Support**: Handle multiple concurrent sessions with unique voices per session
 - ✅ **Voice Differentiation**: Each session uses a different voice for easy identification
 - ✅ **Message Queuing**: Messages are queued and spoken sequentially across all sessions
@@ -38,10 +38,10 @@ node dist/index.js
 
 ### Available Tools
 
-The server provides five MCP tools:
+The server provides six MCP tools:
 
-#### 1. `init`
-Initialize the MCP server and receive behavioral guidelines for the LLM. This should be called at the start of a session. Each session is assigned a unique voice for easy identification.
+#### 1. `enable`
+Enable the speech feature for this session. The LLM will receive behavioral instructions and will introduce itself by speaking. Once enabled, the LLM MUST speak brief summaries for every action and instruction. Each session is assigned a unique voice for easy identification.
 
 **Parameters:**
 - `sessionId` (string): Unique identifier for this session. Use a consistent ID across calls to maintain the same voice.
@@ -51,12 +51,10 @@ Initialize the MCP server and receive behavioral guidelines for the LLM. This sh
 - `sessionId`: The session identifier
 - `name`: Randomly assigned name for this session
 - `voice`: The voice assigned to this session
-- `instructions`: String containing behavioral guidelines for the LLM, including:
-  - Speak about everything the LLM needs to do
-  - Always speak when prompting questions or waiting for answers (user might be busy)
-  - Keep speech concise, leaving details for the terminal
-  - Introduction with the assigned name
-  - Information about multi-session voice support
+- `enabled`: Boolean indicating speech is now enabled
+- `introduction`: Brief introduction message that will be spoken
+- `introductionMessageId`: The message ID of the queued introduction
+- `instructions`: String containing behavioral guidelines for the LLM, instructing it to start speaking NOW for all actions
 
 **Example:**
 ```json
@@ -65,8 +63,27 @@ Initialize the MCP server and receive behavioral guidelines for the LLM. This sh
 }
 ```
 
-#### 2. `speak`
-Add a message to the speech queue to be spoken aloud. The message will be spoken using the voice assigned to your session.
+#### 2. `disable`
+Disable the speech feature for this session. The LLM will stop speaking and will only communicate through text.
+
+**Parameters:**
+- `sessionId` (string): Unique identifier for the session to disable.
+
+**Returns:**
+- `success`: Boolean indicating success
+- `sessionId`: The session identifier
+- `enabled`: Boolean indicating speech is now disabled
+- `message`: Confirmation message
+
+**Example:**
+```json
+{
+  "sessionId": "my-unique-session-id"
+}
+```
+
+#### 3. `speak`
+Add a message to the speech queue to be spoken aloud. The message will be spoken using the voice assigned to your session. **Note:** Speech must be enabled for the session first by calling the `enable` tool.
 
 **Parameters:**
 - `message` (string): The message to speak (max 500 characters, auto-truncated)
@@ -80,7 +97,7 @@ Add a message to the speech queue to be spoken aloud. The message will be spoken
 }
 ```
 
-#### 3. `cancel_message`
+#### 4. `cancel_message`
 Cancel a specific queued message before it's spoken.
 
 **Parameters:**
@@ -93,7 +110,7 @@ Cancel a specific queued message before it's spoken.
 }
 ```
 
-#### 4. `reset_queue`
+#### 5. `reset_queue`
 Reset the entire speech queue and stop any currently playing message. Use this when an action has been cancelled.
 
 **Example:**
@@ -101,7 +118,7 @@ Reset the entire speech queue and stop any currently playing message. Use this w
 {}
 ```
 
-#### 5. `get_queue_status`
+#### 6. `get_queue_status`
 Get the current status of the speech queue.
 
 **Returns:**
@@ -158,13 +175,16 @@ npm run test:ui    # Run tests with UI
 
 ## How It Works
 
-1. The LLM calls `init` with a `sessionId` to receive behavioral guidelines and get assigned a unique voice
-2. Each session gets a different voice (e.g., Alex, Daniel, Samantha) for easy identification
-3. The LLM uses the `speak` tool with its `sessionId` to queue messages
-4. Messages are automatically truncated to 500 characters if needed
-5. The queue is shared across all sessions and processes messages sequentially using macOS's `say` command
-6. This prevents overlapping speech from multiple concurrent sessions
-7. The LLM can cancel individual messages or reset the queue if actions change
+1. The LLM calls `enable` with a `sessionId` to enable the speech feature and get assigned a unique voice
+2. Upon enabling, the LLM receives a brief introduction message that is immediately queued to be spoken
+3. The LLM also receives behavioral guidelines in the JSON response, instructing it to speak NOW for all actions
+4. Each session gets a different voice (e.g., Alex, Daniel, Samantha) for easy identification
+5. The LLM uses the `speak` tool with its `sessionId` to queue messages (only works if speech is enabled)
+6. Messages are automatically truncated to 500 characters if needed
+7. The queue is shared across all sessions and processes messages sequentially using macOS's `say` command
+8. This prevents overlapping speech from multiple concurrent sessions
+9. The LLM can cancel individual messages or reset the queue if actions change
+10. The LLM can call `disable` to turn off speech for a session
 
 ## License
 
